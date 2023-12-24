@@ -1,5 +1,5 @@
 import folium, io, json, sys, math, random, os
-#import psycopg2
+import psycopg2
 from folium.plugins import Draw, MeasureControl
 from jinja2 import Template
 from branca.element import Element
@@ -7,6 +7,10 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
+from pathlib import Path
 
 
 
@@ -125,8 +129,20 @@ class MainWindow(QMainWindow):
         print("Display")
 
     def connect_DB(self):
-        #self.conn = psycopg2.connect(database="l3info_12", user="l3info_12", host="10.11.11.22", password="L3INFO_12")
-        #self.cursor = self.conn.cursor()
+        dotenv_path = Path(os.path.abspath('.')+"/.env")
+        load_dotenv(dotenv_path=dotenv_path)
+
+        DB_CONNECTION = os.getenv('DB_CONNECTION')
+        DB_HOST = os.getenv('DB_HOST')
+        DB_PORT = os.getenv('DB_PORT')
+        DB_DATABASE = os.getenv('DB_DATABASE')
+        DB_USERNAME = os.getenv('DB_USERNAME')
+        DB_PASSWORD = os.getenv('DB_PASSWORD')
+
+        
+        
+        self.conn = psycopg2.connect(database=DB_DATABASE, user=DB_USERNAME, host=DB_HOST, password=DB_PASSWORD)
+        self.cursor = self.conn.cursor()
         print("Connected")
 
 

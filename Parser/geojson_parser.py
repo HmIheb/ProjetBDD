@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 
-dotenv_path = Path('/home/youb/projects/ProjetBDD/.env')
+dotenv_path = Path(os.path.abspath('.')+"/.env")
 load_dotenv(dotenv_path=dotenv_path)
 
 DB_CONNECTION = os.getenv('DB_CONNECTION')
