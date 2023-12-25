@@ -60,12 +60,12 @@ CREATE TABLE paris_staroute AS (
     ) 
 
 
-    SELECT distinct ptd."route_I" as route_id,ptd."from_stop_I"as stop_I,max(seq) as step 
+    SELECT distinct ptd."route_I" as route_id,ptd."from_stop_I"as "stop_I",max(seq) as step 
     FROM paris_temporal_day as ptd
-    group by route_id,stop_I
+    group by route_id,"stop_I"
 
     UNION (
-        select distinct t1.route_id,ptd."to_stop_I",ptd.seq +1 as step
+        select distinct t1.route_id,ptd."to_stop_I" as "stop_I",ptd.seq +1 as step
         from t1,paris_temporal_day as ptd
         where t1.route_id=ptd."route_I"  and ptd.seq = t1.step
     )
@@ -78,7 +78,7 @@ CREATE TABLE paris_trip AS (
     
 );
 ''')
-#conn.commit()
+conn.commit()
 
 #cursor.execute('''ALTER TABLE paris_trip ADD PRIMARY KEY ("from_stop_I","trip_I")''')
 

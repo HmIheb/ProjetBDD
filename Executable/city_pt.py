@@ -52,9 +52,13 @@ class MainWindow(QMainWindow):
         _label = QLabel('City :', self)
         _label.setFixedSize(40,20)
         self.city_box = QComboBox() 
-        self.city_box.setCurrentIndex( 2 )
+        
         self.controls_panel.addWidget(_label)
         self.controls_panel.addWidget(self.city_box)
+        self.city_box.addItem("paris")
+        self.city_box.addItem("sba")
+        self.city_box.setCurrentIndex( 0 )
+        self.city_box.currentIndexChanged.connect(self.city_change)
 
         #select starting point
         _label = QLabel('From: ', self)
@@ -65,6 +69,7 @@ class MainWindow(QMainWindow):
         self.from_box.setInsertPolicy(QComboBox.NoInsert)
         self.controls_panel.addWidget(_label)
         self.controls_panel.addWidget(self.from_box)
+        self.from_box.currentIndexChanged.connect(self.from_change)
 
         #select destination
         _label = QLabel('  To: ', self)
@@ -75,6 +80,7 @@ class MainWindow(QMainWindow):
         self.to_box.setInsertPolicy(QComboBox.NoInsert)
         self.controls_panel.addWidget(_label)
         self.controls_panel.addWidget(self.to_box)
+        self.to_box.currentIndexChanged.connect(self.to_change)
 
 
         #select mean of transport you want to use
@@ -112,12 +118,79 @@ class MainWindow(QMainWindow):
         self.maptype_box.addItems(self.webView.maptypes)
         self.maptype_box.currentIndexChanged.connect(self.webView.setMap)
         self.controls_panel.addWidget(self.maptype_box)
+
+        #point = [latitude,longitude]
+        self.point1 =[0,0]
+        self.point2=[0,0]
            
         self.connect_DB()
 
-        self.startingpoint = True
+        
+
+        self.startingpoint=True
+
+
                    
         self.show()
+    
+    def city_change(self):
+        self.from_box.clear()
+        self.to_box.clear()
+
+        self.from_box.addItem(str("Personalized"))
+        self.to_box.addItem(str("Personalized"))
+
+        _city = str(self.city_box.currentText())
+
+        self.cursor.execute(""f"SELECT distinct name from {_city}_nodes """)
+        self.conn.commit()
+        rows = self.cursor.fetchall()
+
+        for row in rows : 
+            self.from_box.addItem(str(row[0]))
+            self.to_box.addItem(str(row[0]))
+        print("Connected")
+
+        self.from_box.setCurrentIndex(1)
+        self.to_box.setCurrentIndex(1)
+
+        #TODO set focus on the choosen city
+
+
+    def from_change(self):
+        if self.from_box.currentIndex()==0:
+            print("personalized")
+        else :
+            _city = str(self.city_box.currentText())
+            _from = str(self.from_box.currentText())
+            self.cursor.execute(""f"SELECT lat,lon FROM {_city}_nodes WHERE name=$${_from}$$ """)
+            self.conn.commit()
+            rows = self.cursor.fetchall()
+
+            self.point1=[rows[0][0],rows[0][1]]
+            self.drawstartend()
+        
+            print("selected")
+    
+
+    def to_change(self):
+        if self.from_box.currentIndex()==0:
+            print("personalized")
+        else :
+            _city = str(self.city_box.currentText())
+            _to = str(self.to_box.currentText())
+            self.cursor.execute(""f"SELECT lat,lon FROM {_city}_nodes WHERE name=$${_to}$$ """)
+            self.conn.commit()
+            rows = self.cursor.fetchall()
+
+            self.point2=[rows[0][0],rows[0][1]]
+            self.drawstartend()
+        
+            print("selected")
+
+    
+        
+
 
     def button_Go(self):
         print(self.subway_check.isChecked())
@@ -143,8 +216,41 @@ class MainWindow(QMainWindow):
         
         self.conn = psycopg2.connect(database=DB_DATABASE, user=DB_USERNAME, host=DB_HOST, password=DB_PASSWORD)
         self.cursor = self.conn.cursor()
+
+        _city = str(self.city_box.currentText())
+        self.from_box.addItem(str("Personalized"))
+        self.to_box.addItem(str("Personalized"))
+
+        self.cursor.execute(""f"SELECT distinct name from {_city}_nodes """)
+        self.conn.commit()
+        rows = self.cursor.fetchall()
+
+        for row in rows : 
+            self.from_box.addItem(str(row[0]))
+            self.to_box.addItem(str(row[0]))
         print("Connected")
 
+        self.from_box.setCurrentIndex(1)
+        self.to_box.setCurrentIndex(1)
+
+    def mouseClick(self, lat, lng):
+        
+        print(f"Clicked on: latitude {lat}, longitude {lng}")
+        
+        if self.startingpoint :
+            self.from_box.setCurrentIndex(0)
+            self.point1=[lat,lng]
+        else :
+            self.to_box.setCurrentIndex(0)
+            self.point2=[lat,lng]
+        self.startingpoint = not self.startingpoint
+
+        self.drawstartend()
+
+    def drawstartend(self):
+        self.webView.addPointMarker(self.point1[0], self.point1[1])
+        self.webView.addPointMarker(self.point2[0], self.point2[1])
+        print(self.point1[0])
 
 
 
