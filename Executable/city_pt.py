@@ -197,21 +197,19 @@ class MainWindow(QMainWindow):
 
         r=""
         if (not self.tram_check.isChecked()):
-            r+="AND "+s+".route_type"+i+"<> 0"
+            r+=" AND "+s+".route_type"+i+"<> 0"
         
         if (not self.rail_check.isChecked()):
-            r+="AND "+s+".route_type"+i+"<> 2"
+            r+=" AND "+s+".route_type"+i+"<> 2"
         
         if (not self.subway_check.isChecked()):
-            r+="AND "+s+".route_type"+i+"<> 1"
+            r+=" AND "+s+".route_type"+i+"<> 1 "
         
         if (not self.bus_check.isChecked()):
-            r+="AND "+s+".route_type"+i+"<> 3"
+            r+=" AND "+s+".route_type"+i+"<> 3"
         return r
 
         
-
-
     def button_Go(self):
         self.tableWidget.clearContents()
 
@@ -271,8 +269,102 @@ tf AS (
     limit 5
 
 '''
+
+        query2='''
+            WITH 
+        t1 AS (
+        SELECT name as name1,"stop_I",lat as lat1,lon as lon1,
+        (
+        6371 * acos(cos(radians('''+self.point1[0].__str__()+''')) * cos(radians(lat)) * cos(radians(lon) - radians('''+self.point1[1].__str__()+''')) +sin(radians('''+self.point1[0].__str__()+''')) * sin(radians(lat))
+        )
+            ) AS distance1
+FROM '''+_city+'''_nodes
+ORDER BY distance1
+LIMIT 6),
+
+t2 AS (
+    SELECT name as name4,"stop_I",lat as lat4,lon as lon4,
+    (
+        6371 * acos(cos(radians('''+self.point2[0].__str__()+''')) * cos(radians(lat)) * cos(radians(lon) - radians('''+self.point2[1].__str__()+''')) +sin(radians('''+self.point2[0].__str__()+''')) * sin(radians(lat))
+        )
+    ) AS distance2
+FROM '''+_city+'''_nodes
+ORDER BY distance2
+LIMIT 6),
+
+t3bis AS (
+    SELECT t1.name1,lat1,lon1,t1."stop_I",t1.distance1,ps.route_id as route_id1,ps.step as step1
+    FROM t1,'''+_city+'''_staroute as ps
+    where t1."stop_I"=ps."stop_I" 
+),
+
+t3 AS (
+    SELECT distance1,name1,lat1,lon1,step1,t3bis.route_id1,pr.route_name as route_name1,pr.route_type as route_type1,pr.averagetime as avgt1
+    FROM t3bis inner join '''+_city+'''_routes_info as pr on t3bis.route_id1 = pr.route_id
+),
+
+
+t4bis AS (
+    SELECT t2.name4,lat4,lon4,t2."stop_I" as stop4,t2.distance2,ps.route_id as route_id2,ps.step as step4
+    FROM t2,'''+_city+'''_staroute as ps
+    where t2."stop_I"=ps."stop_I" 
+),
+
+t4 AS (
+    SELECT t4bis.route_id2,pr.route_name as route_name2,pr.route_type as route_type2,pr.averagetime as avgt2,t4bis.name4,t4bis.lat4,t4bis.lon4,t4bis.step4,t4bis.distance2
+    FROM t4bis inner join '''+_city+'''_routes_info as pr on t4bis.route_id2 = pr.route_id
+),
+
+t5bis AS (
+    SELECT distance1,name1,lat1,lon1,step1,route_id1,route_name1,route_type1,avgt1,ps."stop_I" as stop2,ps.step as step2
+    FROM t3,'''+_city+'''_staroute as ps
+    where t3.route_id1=ps.route_id  and t3.step1<ps.step
+),
+
+t5 AS (
+    SELECT distance1,name1,lat1,lon1,step1,route_id1,route_name1,route_type1,avgt1,pn.name as name2,pn.lat as lat2,pn.lon as lon2, stop2,step2
+    from t5bis inner join '''+_city+'''_nodes as pn on t5bis.stop2=pn."stop_I"
+),
+
+t6bis AS (
+    select distance1,name1,lat1,lon1,step1,route_id1,route_name1,route_type1,avgt1,name2,lat2,lon2, stop2,step2,pw."to_stop_I" as stop3,pw.d_walk as d1
+    FROM t5,'''+_city+'''_walk as pw
+    where t5.stop2=pw."from_stop_I"
+    UNION
+    (
+    select distance1,name1,lat1,lon1,step1,route_id1,route_name1,route_type1,avgt1,name2,lat2,lon2, stop2,step2,pw."from_stop_I" as stop3,pw.d_walk as d1
+    FROM t5,'''+_city+'''_walk as pw
+    where t5.stop2=pw."to_stop_I"
+    )
+),
+t6 AS (
+    SELECT distance1,name1,lat1,lon1,step1,route_id1,route_name1,route_type1,avgt1,name2,lat2,lon2, stop2,step2,d1,stop3,pn.name as name3,pn.lat as lat3,pn.lon as lon3
+    from t6bis inner join '''+_city+'''_nodes as pn on t6bis.stop3=pn."stop_I"
+),
+
+t7 AS (
+    select distance1,name1,lat1,lon1,step1,route_id1,route_name1,route_type1,avgt1,name2,lat2,lon2, stop2,step2,d1,stop3,name3,lat3,lon3,ps.route_id as route_id2,ps.step as step3
+    FROM t6,'''+_city+'''_staroute as ps
+    where t6.stop3=ps."stop_I" and t6.route_id1<>ps.route_id
+),
+
+    tf as (
+    SELECT * 
+    FROM t7 inner join t4 on  t7.route_id2=t4.route_id2
+    where t7.step3<t4.step4 '''+self.tfilter("t7","1")+self.tfilter("t4","2")+'''
+    )
+
+    SELECT 2 as hop, (((tf.distance1+tf.distance2+(d1/1000))*720)+tf.avgt1*(step2-step1)+ tf.avgt2*(step4-step3)) as time,distance1,name1,lat1,lon1,step1,route_name1,route_type1,name2,lat2,lon2,step2,d1,name3,lat3,lon3,step3,route_name2,route_type2,name4,lat4,lon4,step4,distance2
+    FROM tf
+    ORDER BY time
+    limit 10
+'''
         
         self.cursor.execute(query1)
+        self.conn.commit()
+        self.rows += self.cursor.fetchall()
+
+        self.cursor.execute(query2)
         self.conn.commit()
         self.rows += self.cursor.fetchall()
         #if we don't find anything we just give Walk
@@ -284,7 +376,10 @@ tf AS (
         
 
         self.tableWidget.setRowCount(len(self.rows))
-        self.tableWidget.setColumnCount((1+2*self.rows[-1][0]))
+        if self.rows[-1][0] == 1:
+            self.tableWidget.setColumnCount(3)
+        if self.rows[-1][0] == 2:
+            self.tableWidget.setColumnCount(7)
         i = 0
         for row in self.rows :
             #case hop 1 
@@ -292,6 +387,14 @@ tf AS (
                 self.tableWidget.setItem(i, 0, QTableWidgetItem(str(row[3])))
                 self.tableWidget.setItem(i, 1, QTableWidgetItem(str(row[7])))
                 self.tableWidget.setItem(i, 2, QTableWidgetItem(str(row[9])))
+            elif row[0]==2 :
+                self.tableWidget.setItem(i, 0, QTableWidgetItem(str(row[3])))
+                self.tableWidget.setItem(i, 1, QTableWidgetItem(str(row[7])))
+                self.tableWidget.setItem(i, 2, QTableWidgetItem(str(row[9])))
+                self.tableWidget.setItem(i, 3, QTableWidgetItem("change/walk"))
+                self.tableWidget.setItem(i, 4, QTableWidgetItem(str(row[14])))
+                self.tableWidget.setItem(i, 5, QTableWidgetItem(str(row[18])))
+                self.tableWidget.setItem(i, 6, QTableWidgetItem(str(row[20])))
                   
             i = i + 1
             
@@ -305,7 +408,19 @@ tf AS (
     def table_Click(self):
         i=self.tableWidget.currentRow()
         #case row clicked hop = 1
-        if self.rows[i][0]==1:
+        if len(self.rows)==0 :
+
+            #drawing of the way
+            self.webView.addSegment(self.point1[0],self.point1[1],self.point2[0],self.point2[1])
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Information)
+            dist = 6371.0 * 2 * math.atan2(math.sqrt(math.sin((math.radians(self.point2[0]) - math.radians(self.point1[0])) / 2)**2 + math.cos(math.radians(self.point1[0])) * math.cos(math.radians(self.point2[0])) * math.sin((math.radians(self.point2[1]) - math.radians(self.point1[1])) / 2)**2), math.sqrt(1 - math.sin((math.radians(self.point2[0]) - math.radians(self.point1[0])) / 2)**2 + math.cos(math.radians(self.point1[0])) * math.cos(math.radians(self.point2[0])) * math.sin((math.radians(self.point2[1]) - math.radians(self.point1[1])) / 2)**2))
+            msg.setText("your trip will take "+str(dist)+" km approximately")
+            msg.setWindowTitle("MessageBox demo")
+            msg.exec()
+
+
+        elif self.rows[i][0]==1:
 
             #description of the trip in a little window
             msg = QMessageBox()
@@ -321,6 +436,26 @@ tf AS (
             self.webView.addSegment(self.rows[i][4],self.rows[i][5],self.rows[i][10],self.rows[i][11])
 
             msg.exec()
+        
+        elif self.rows[i][0]==2:
+
+            #description of the trip in a little window
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Information)
+            msg.setText("your trip will take "+str((self.rows[i][1]/60))+" minutes approximately")
+            msg.setInformativeText("you have to walk to "+self.rows[i][3]+" then take the "+self.rows[i][7]+ " until you arrive to "+self.rows[i][9]+" then walk to "+self.rows[i][14]+" then take the "+self.rows[i][18]+ " until you arrive to "+self.rows[i][20]+" then walk to your destination")
+            msg.setWindowTitle("MessageBox demo")
+
+
+            #drawing of the way
+            self.webView.addSegment(self.point1[0],self.point1[1],self.rows[i][4],self.rows[i][5])
+            self.webView.addSegment(self.rows[i][4],self.rows[i][5],self.rows[i][10],self.rows[i][11])
+            self.webView.addSegment(self.rows[i][10],self.rows[i][11],self.rows[i][15],self.rows[i][16])
+            self.webView.addSegment(self.rows[i][15],self.rows[i][16],self.rows[i][21],self.rows[i][22])
+            self.webView.addSegment(self.point2[0],self.point2[1],self.rows[i][21],self.rows[i][22])
+
+            msg.exec()
+        
 
 
 
