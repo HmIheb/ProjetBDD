@@ -60,6 +60,8 @@ class MainWindow(QMainWindow):
         self.city_box.setCurrentIndex( 0 )
         self.city_box.currentIndexChanged.connect(self.city_change)
 
+       
+
         #select starting point
         _label = QLabel('From: ', self)
         _label.setFixedSize(40,20)
@@ -130,7 +132,6 @@ class MainWindow(QMainWindow):
         self.startingpoint=True
 
 
-                   
         self.show()
     
     def city_change(self):
@@ -188,18 +189,140 @@ class MainWindow(QMainWindow):
         
             print("selected")
 
-    
+    #Used to filter the means of transport s
+    #s is the name of the table to apply the filter 
+    #i is the suffixe added to route_type if there is many routes
+    def tfilter(self,s,i):
+        
+
+        r=""
+        if (not self.tram_check.isChecked()):
+            r+="AND "+s+".route_type"+i+"<> 0"
+        
+        if (not self.rail_check.isChecked()):
+            r+="AND "+s+".route_type"+i+"<> 2"
+        
+        if (not self.subway_check.isChecked()):
+            r+="AND "+s+".route_type"+i+"<> 1"
+        
+        if (not self.bus_check.isChecked()):
+            r+="AND "+s+".route_type"+i+"<> 3"
+        return r
+
         
 
 
     def button_Go(self):
-        print(self.subway_check.isChecked())
+        self.tableWidget.clearContents()
+
+        _fromstation = str(self.from_box.currentText())
+        _tostation = str(self.to_box.currentText())
+        _city = str(self.city_box.currentText())
+
+        self.rows = []
+
+    
+
+
+        #query 1 is for direct trip between two points with a sequence of : walk --> transport --> walk
+        query1 = ''' 
+                    WITH 
+        t1 AS (
+        SELECT name as name1,"stop_I",lat as lat1,lon as lon1,
+        (
+        6371 * acos(cos(radians('''+self.point1[0].__str__()+''')) * cos(radians(lat)) * cos(radians(lon) - radians('''+self.point1[1].__str__()+''')) +sin(radians('''+self.point1[0].__str__()+''')) * sin(radians(lat))
+        )
+            ) AS distance1
+FROM '''+_city+'''_nodes
+ORDER BY distance1
+LIMIT 6),
+
+t2 AS (
+    SELECT name as name2,"stop_I",lat as lat2,lon as lon2,
+    (
+        6371 * acos(cos(radians('''+self.point2[0].__str__()+''')) * cos(radians(lat)) * cos(radians(lon) - radians('''+self.point2[1].__str__()+''')) +sin(radians('''+self.point2[0].__str__()+''')) * sin(radians(lat))
+        )
+    ) AS distance2
+FROM '''+_city+'''_nodes
+ORDER BY distance2
+LIMIT 6),
+
+t3 AS (
+    SELECT t1.name1,lat1,lon1,t1."stop_I",t1.distance1,ps.route_id,ps.step as step1
+    FROM t1,'''+_city+'''_staroute as ps
+    where t1."stop_I"=ps."stop_I" 
+),
+
+t4 AS (
+    SELECT t2.name2,lat2,lon2,t2."stop_I",t2.distance2,ps.route_id,ps.step as step2
+    FROM t2,'''+_city+'''_staroute as ps
+    where t2."stop_I"=ps."stop_I" 
+),
+
+tf AS (
+    SELECT * 
+    FROM (t3 inner join t4 using(route_id))inner join '''+_city+'''_routes_info using(route_id)
+    where t3.step1<t4.step2 '''+self.tfilter(_city+"_routes_info","")+'''
+)
+
+    SELECT 1 as hop,(((tf.distance1+tf.distance2)*720)+tf.averagetime*(step2-step1)) as time,tf.distance1,tf.name1,lat1,lon1,step1,route_name,route_type,name2,lat2,lon2,step2,distance2
+    FROM tf
+    order by time
+    limit 5
+
+'''
+        
+        self.cursor.execute(query1)
+        self.conn.commit()
+        self.rows += self.cursor.fetchall()
+        #if we don't find anything we just give Walk
+        if len(self.rows) == 0 : 
+            self.tableWidget.setRowCount(1)
+            self.tableWidget.setColumnCount(1)
+            self.tableWidget.setItem(0, 0, QTableWidgetItem(str("Walk")))
+            return
+        
+
+        self.tableWidget.setRowCount(len(self.rows))
+        self.tableWidget.setColumnCount((1+2*self.rows[-1][0]))
+        i = 0
+        for row in self.rows :
+            #case hop 1 
+            if row[0]==1:
+                self.tableWidget.setItem(i, 0, QTableWidgetItem(str(row[3])))
+                self.tableWidget.setItem(i, 1, QTableWidgetItem(str(row[7])))
+                self.tableWidget.setItem(i, 2, QTableWidgetItem(str(row[9])))
+                  
+            i = i + 1
+            
+        self.update()
+            
 
     def button_Clear(self):
         print(self.rail_check.isChecked())
+        self.webView.clearMap(self.maptype_box.currentIndex())
 
     def table_Click(self):
-        print("Display")
+        i=self.tableWidget.currentRow()
+        #case row clicked hop = 1
+        if self.rows[i][0]==1:
+
+            #description of the trip in a little window
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Information)
+            msg.setText("your trip will take "+str((self.rows[i][1]/60))+" minutes approximately")
+            msg.setInformativeText("you have to walk to "+self.rows[i][3]+" then take the "+self.rows[i][7]+ " until you arrive to "+self.rows[i][9]+"then walk to your destination")
+            msg.setWindowTitle("MessageBox demo")
+
+
+            #drawing of the way
+            self.webView.addSegment(self.point1[0],self.point1[1],self.rows[i][4],self.rows[i][5])
+            self.webView.addSegment(self.point2[0],self.point2[1],self.rows[i][10],self.rows[i][11])
+            self.webView.addSegment(self.rows[i][4],self.rows[i][5],self.rows[i][10],self.rows[i][11])
+
+            msg.exec()
+
+
 
     def connect_DB(self):
         dotenv_path = Path(os.path.abspath('.')+"/.env")
@@ -234,6 +357,7 @@ class MainWindow(QMainWindow):
         self.to_box.setCurrentIndex(1)
 
     def mouseClick(self, lat, lng):
+
         
         print(f"Clicked on: latitude {lat}, longitude {lng}")
         
