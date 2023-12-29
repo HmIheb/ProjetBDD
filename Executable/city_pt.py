@@ -7,6 +7,8 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+from dotenv import load_dotenv
+from pathlib import Path
 from sqlalchemy import create_engine
 import os
 from dotenv import load_dotenv
@@ -22,7 +24,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.resize(1000, 600)
-        self.setWindowTitle("Win nro7")
+        self.setWindowTitle("Win nro7 (iheb ro7 ta3ti)")
 	
         # main widget
         main = QWidget()

@@ -22,13 +22,17 @@ DB_PASSWORD = os.getenv('DB_PASSWORD')
 engine = create_engine(f'{DB_CONNECTION}://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_DATABASE}')
 conn = engine.connect()
   
+cities = ['paris']
 
-#we can modify the table later to specify the primary keys and other properties
-geodf = gpd.read_file("paris/routes.geojson")
-geodf.to_postgis(name='paris_routes',con=conn,if_exists='replace')
 
-geodf = gpd.read_file("paris/sections.geojson")
-geodf.to_postgis(name='paris_sections',con=conn,if_exists='replace')
+for city in cities:
 
-geodf = gpd.read_file("paris/stops.geojson")
-geodf.to_postgis(name='paris_stops',con=conn,if_exists='replace')
+    #we can modify the table later to specify the primary keys and other properties
+    geodf = gpd.read_file(city+"/routes.geojson")
+    geodf.to_postgis(name=city+'_routes',con=conn,if_exists='replace')
+
+    geodf = gpd.read_file(city+"/sections.geojson")
+    geodf.to_postgis(name=city+'_sections',con=conn,if_exists='replace')
+
+    geodf = gpd.read_file(city+"/stops.geojson")
+    geodf.to_postgis(name=city+'_stops',con=conn,if_exists='replace')
