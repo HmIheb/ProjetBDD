@@ -26,10 +26,10 @@ conn = engine.connect()
 
 #we can modify the table later to specify the primary keys and other properties
 geodf = gpd.read_file(os.path.abspath('..')+"/paris/routes.geojson")
-geodf.to_postgis(name='paris_routes',con=conn,if_exists='replace')
+geodf.to_postgis(name='paris_routes',con=conn,if_exists='replace',index=False)
 
 geodf = gpd.read_file(os.path.abspath('..')+"/paris/sections.geojson")
-geodf.to_postgis(name='paris_sections',con=conn,if_exists='replace')
+geodf.to_postgis(name='paris_sections',con=conn,if_exists='replace',index = False)
 
 geodf = gpd.read_file(os.path.abspath('..')+"/paris/stops.geojson")
-geodf.to_postgis(name='paris_stops',con=conn,if_exists='replace')
+geodf.to_postgis(name='paris_stops',con=conn,if_exists='replace',index = False)

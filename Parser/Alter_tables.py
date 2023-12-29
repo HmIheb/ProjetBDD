@@ -32,4 +32,6 @@ cursor.execute('''ALTER TABLE paris_temporal_day ADD FOREIGN KEY ("route_I") REF
 # route_I exists in paris_temporal_I but not paris_routes
 #cursor.execute('''ALTER TABLE paris_temporal_week ADD FOREIGN KEY ("route_I") REFERENCES paris_routes("route_I")''')
 
+cursor.execute('''UPDATE paris_combined SET "route_I_counts" = left("route_I_counts",strpos("route_I_counts",':')-1)''')
+
 conn.commit()

@@ -194,7 +194,54 @@ class MainWindow(QMainWindow):
 
     def button_Go(self):
         print(self.subway_check.isChecked())
+        _fromstation = str(self.from_box.currentText())
+        _tostation = str(self.to_box.currentText())
+        _city = str(self.city_box.currentText())
+        self.cursor.execute(''f'select "stop_I" from paris_stops where name =$${_fromstation}$$''')
+        self.conn.commit()
+        query=self.cursor.fetchall()
+        _fromstation_id = query[0][0]
+        self.cursor.execute(''f'select "stop_I" from paris_stops where name =$${_tostation}$$''')
+        self.conn.commit()
+        query=self.cursor.fetchall()
+        _tostation_id = query[0][0]
+        self.cursor.execute(''f'select "to_stop_I" from paris_walk where "from_stop_I" ={int(_fromstation_id)}''')
+        self.conn.commit()
+        query=self.cursor.fetchall()
+        closes_stations = []
+        for row in query :
+            closes_stations.append(row[0]) 
+        closes_stations = tuple(closes_stations)
+        self.cursor.execute(''f'select * from paris_staroute where "stop_I" in {closes_stations}''')
+        self.conn.commit()
+        infos=self.cursor.fetchall()
+        query='''with t3("from_stop_I","to_stop_I","d_walk") as ((select "from_stop_I","to_stop_I",d_walk from paris_walk where "from_stop_I"=%s) UNION (select "to_stop_I","from_stop_I",d_walk
+        from paris_walk where "to_stop_I" = %s))
+        select * from (('''%(_fromstation_id,_fromstation_id)
+        table = []
+        for i in range(len(infos)) : 
+            que = '''(with table1("to_stop_I",to_name,step,duration) AS
+                    (select B."stop_I",B.name,step,sum(duration_avg) OVER (order by step)as duration 
+                    from ((select "from_stop_I","to_stop_I",duration_avg,"route_I_counts" from paris_combined where "route_I_counts" = '%s')as A
+                    INNER JOIN paris_stops on "to_stop_I"=CAST(paris_stops."stop_I" as bigint)) as B 
+                    INNER JOIN paris_staroute on CAST(B."stop_I" as bigint)=paris_staroute."stop_I" and CAST(B."route_I_counts" as bigint)=route_id 
+                    where step>%d),
+                    table2(id,name) as (select "stop_I",name from paris_stops where "stop_I"='%d'), 
+                    table3(corr) as (select route_name from paris_routes where "route_I"=%d)
+                    SELECT * from table2,table3,table1)
+            '''%(infos[i][0],infos[i][2],infos[i][1],infos[i][0])
+            if i != len(infos)-1 : query = query +que+ 'UNION'
+            else : query = query +que + ''')as final left outer join  paris_walk on cast(final."to_stop_I" as bigint) = "from_stop_I")
+            left outer join t3 on cast(final.id as bigint)= t3."to_stop_I" 
+            where final."to_stop_I" ='%s' or paris_walk."to_stop_I" ='%s' order by final.id;'''%(_tostation_id,_tostation_id)
 
+        self.cursor.execute(query)
+        self.conn.commit()
+        table.append(self.cursor.fetchall())
+        for a in table :
+            for b in a :
+                print(b)
+                   
     def button_Clear(self):
         print(self.rail_check.isChecked())
 

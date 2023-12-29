@@ -21,7 +21,7 @@ DB_PASSWORD = os.getenv('DB_PASSWORD')
 engine = create_engine(f'{DB_CONNECTION}://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_DATABASE}')
 conn = engine.connect()
 
-df = pd.read_csv(os.path.abspath('.')+"/paris/network_combined.csv",sep=';')
+df = pd.read_csv(os.path.abspath('..')+"/paris/network_combined.csv",sep=';')
 df["route_I_counts"]=df["route_I_counts"].str.split(",")
 df=df.explode("route_I_counts")
 df['route_I_counts']=df["route_I_counts"].str.split(":").str[0]
